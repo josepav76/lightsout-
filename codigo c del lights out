@@ -1,0 +1,604 @@
+/*
+ ============================================================================
+ Name        : lights_out.c
+ Author      : 
+ Version     :
+ Copyright   : Your copyright notice
+ Description : Hello World in GTK+
+ ============================================================================
+ */
+
+#include <gtk/gtk.h>
+#include <time.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include "resuelve.h"
+int indicesolu1, indicesolu2;
+
+GtkWidget *button;
+GtkWidget *vbutton[8 * 8];
+GObject *idEtiquetaInfoBar;
+int n, m;
+int click;
+GtkWidget *dialog;
+GObject *grid1;
+GObject *grid2;
+GObject *ventana_principal;
+GObject *ventana_juego;
+GObject *fil3, *fil4, *fil5, *fil6, *fil7, *fil8, *col3, *col4, *col5, *col6,
+		*col7, *col8;
+GObject *juega_hum, *juega_pc;
+GObject *boton_sgte;
+GObject*boton_atras;
+GObject *boton_sgt; //botones para los clicks de la pc
+GtkBuilder *builder;
+GObject *boton_ir_jugar;
+GObject *contador; //contador de clicks realizados
+int modofil3 = 0, modofil4 = 0, modofil5 = 0, modofil6 = 0, modofil7 = 0,
+		modofil8 = 0;
+int modocol3 = 0, modocol4 = 0, modocol5 = 0, modocol6 = 0, modocol7 = 0,
+		modocol8 = 0;
+int op_juega_hum = 0, op_juega_pc = 0;
+void check_fil3();
+void check_fil4();
+void check_fil5();
+void check_fil6();
+void check_fil7();
+void check_fil8();
+void check_col3();
+void check_col4();
+void check_col5();
+void check_col6();
+void check_col7();
+void check_col8();
+void check_hum();
+void check_pc();
+void funcion_boton_jugar();
+
+char *convertir_entero_a_cadena(int num) {
+#define MAX_TAM 80
+
+	char *cad;
+	int digito;
+	int i = 0;
+
+	cad = (char*) malloc(MAX_TAM * sizeof(char)); /* No olvidar liberar la memoria asignada */
+	memcpy(cad, "\0", MAX_TAM); /* Bruto, pero efectivo :) */
+
+	while (num >= 1) {
+		digito = num % 10;
+
+		if (i < MAX_TAM - 1) {
+			cad[i] = (char) (digito + 48);
+			num -= digito;
+			num /= 10;
+		}
+
+		++i;
+	}
+
+	/* Pero los dšªgitos de la cadena han quedado en orden inverso,  */
+	/* asšª que los ordenamos correctamente */
+
+	int tam = strlen(cad);
+	char temp;
+
+	for (i = 0; i < tam / 2; ++i) {
+		temp = cad[i];
+		cad[i] = cad[tam - i - 1];
+		cad[tam - i - 1] = temp;
+	}
+
+	return cad;
+}
+
+int comprobar_validez() {
+	int i, j;
+	char aux[8][8];
+	for (i = 0; i < n; i++) {
+		for (j = 0; j < m; j++) {
+			aux[i][j] = matriz[i][j];
+		}
+	}
+	for (i = 0; i < n; i++) {
+		for (j = 0; j < m; j++) {
+			if (resultado[i][j] == 1) {
+				aux[i][j] = ++aux[i][j] % 2;
+				if (i - 1 >= 0) {
+					aux[i - 1][j] = ++aux[i - 1][j] % 2;
+				}
+				if (i + 1 >= 0) {
+					aux[i + 1][j] = ++aux[i + 1][j] % 2;
+				}
+				if (j - 1 >= 0) {
+					aux[i][j - 1] = ++aux[i][j - 1] % 2;
+				}
+				if (j + 1 >= 0) {
+					aux[i][j + 1] = ++aux[i][j + 1] % 2;
+				}
+			}
+		}
+	}
+	for (i = 0; i < n; i++) {
+		for (j = 0; j < m; j++) {
+			if (!aux[i][j]) {
+				return 0;
+			}
+		}
+	}
+	if (comprobar_ganador() == 1) {
+		return 0;
+	}
+	return 1;
+}
+int fila() {
+	if (modofil3 == 1) {
+		return 3;
+	} else if (modofil4 == 1) {
+		return 4;
+	} else if (modofil5 == 1) {
+		return 5;
+	} else if (modofil6 == 1) {
+		return 6;
+	} else if (modofil7 == 1) {
+		return 7;
+	} else if (modofil8 == 1) {
+		return 8;
+	}
+	return 3;
+}
+int columna() {
+	if (modocol3 == 1) {
+		return 3;
+	} else if (modocol4 == 1) {
+		return 4;
+	} else if (modocol5 == 1) {
+		return 5;
+	} else if (modocol6 == 1) {
+		return 6;
+	} else if (modocol7 == 1) {
+		return 7;
+	} else if (modocol8 == 1) {
+		return 8;
+	}
+	return 3;
+}
+void cerar(){
+	int i,j;
+	for (i = 0; i < n; i++) {
+			for (j = 0; j < m; j++) {
+				matriz[i][j]=0;
+			}
+	}
+}
+void generarTablero(int n, int m) {
+	int a;
+	int i, j, k;
+	do {
+		cerar();
+		a = rand() % (n * m) + 1;
+
+		for (k = 0; k < a; k++) {
+			i = rand() % n;
+			j = rand() % m;
+			matriz[i][j] = 1;
+		}
+		resuelve(n, m);
+	} while (!comprobar_validez());
+}
+int comprobar_ganador() {
+	int i, j;
+	for (i = 0; i < n; i++) {
+		for (j = 0; j < m; j++) {
+			if (!matriz[i][j]) {
+				return 0;
+			}
+		}
+	}
+	return 1;
+}
+static void print_hello(GtkWidget *widget, int data) {
+	int i, j;
+	i = data / m;
+	j = data - m * i;
+	click++;
+	gtk_label_set_text(GTK_LABEL(contador), convertir_entero_a_cadena(click));
+	//=================================================================================
+	matriz[i][j] = (++(matriz[i][j])) % 2;
+	resultado[i][j] = (++(resultado[i][j])) % 2;
+	if (!matriz[i][j]) {
+		gtk_button_set_label(GTK_BUTTON(vbutton[data]), "x");
+	} else {
+		gtk_button_set_label(GTK_BUTTON(vbutton[data]), "  ");
+	}
+
+	//=================================================================================
+	if (i - 1 >= 0) {
+		matriz[i - 1][j] = (++(matriz[i - 1][j])) % 2;
+		if (!matriz[i - 1][j]) {
+			gtk_button_set_label(GTK_BUTTON(vbutton[data-m]), "x");
+		} else {
+			gtk_button_set_label(GTK_BUTTON(vbutton[data-m]), "  ");
+		}
+	}
+
+	//=================================================================================
+	if (i + 1 < n) {
+		matriz[i + 1][j] = (++(matriz[i + 1][j])) % 2;
+		if (!matriz[i + 1][j]) {
+			gtk_button_set_label(GTK_BUTTON(vbutton[data+m]), "x");
+		} else {
+			gtk_button_set_label(GTK_BUTTON(vbutton[data+m]), "  ");
+		}
+	}
+
+	//=================================================================================
+	if (j - 1 >= 0) {
+		matriz[i][j - 1] = (++(matriz[i][j - 1])) % 2;
+		if (!matriz[i][j - 1]) {
+			gtk_button_set_label(GTK_BUTTON(vbutton[data-1]), "x");
+		} else {
+			gtk_button_set_label(GTK_BUTTON(vbutton[data-1]), "  ");
+		}
+	}
+
+	//=================================================================================
+	if (j + 1 < m) {
+		matriz[i][j + 1] = (++(matriz[i][j + 1])) % 2;
+		if (!matriz[i][j + 1]) {
+			gtk_button_set_label(GTK_BUTTON(vbutton[data+1]), "x");
+		} else {
+			gtk_button_set_label(GTK_BUTTON(vbutton[data+1]), "  ");
+		}
+	}
+	//=================================================================================
+	if (comprobar_ganador() == 1) {
+		dialog = gtk_message_dialog_new(GTK_WINDOW (ventana_principal),
+				GTK_DIALOG_DESTROY_WITH_PARENT, GTK_MESSAGE_INFO,
+				GTK_BUTTONS_CLOSE, "¡ HA GANADO !");
+		gtk_label_set_text(GTK_LABEL(idEtiquetaInfoBar),
+				"¡ LA PARTIDA TERMINÓ !");
+		gtk_dialog_run(GTK_DIALOG(dialog) );
+
+		gtk_widget_destroy(GTK_WIDGET(dialog) ); // Eliminamos ventana de diálogo
+	}
+
+	//=================================================================================
+
+}
+void print_hello2(GtkWidget *widget, int data){
+	int i, j;
+	i = data / m;
+	j = data - m * i;
+	matriz[i][j] = (++(matriz[i][j])) % 2;
+		if (!matriz[i][j]) {
+			gtk_button_set_label(GTK_BUTTON(vbutton[data]), "x");
+		} else {
+			gtk_button_set_label(GTK_BUTTON(vbutton[data]), "  ");
+		}
+}
+void generarGrilla2(int n, int m) {
+	grid1 = gtk_grid_new();
+	gtk_grid_set_column_homogeneous(GTK_GRID(grid1), TRUE);
+	gtk_grid_set_row_homogeneous(GTK_GRID(grid1), TRUE);
+	/* Pack the container in the window */
+	gtk_container_add(grid2, grid1);
+	int i, j;
+
+	for (i = 0; i < n; i++) {
+		for (j = 0; j < m; j++) {
+			if (!matriz[i][j]) {
+				button = gtk_button_new_with_label("x");
+			} else {
+				button = gtk_button_new_with_label("  ");
+			}
+			g_signal_connect(button, "clicked", G_CALLBACK (print_hello2),
+					(int * ) (j + m * i));
+			/* Place the first button in the grid cell (j, i), and make it fill
+			 * just 1 cell horizontally and vertically (ie no spanning)
+			 */
+			vbutton[j + m * i] = button;
+			gtk_grid_attach(GTK_GRID(grid1), button, j, i, 1, 1);
+
+		}
+	}
+}
+void generarGrilla(int n, int m) {
+	grid1 = gtk_grid_new();
+	gtk_grid_set_column_homogeneous(GTK_GRID(grid1), TRUE);
+	gtk_grid_set_row_homogeneous(GTK_GRID(grid1), TRUE);
+	/* Pack the container in the window */
+	gtk_container_add(grid2, grid1);
+	int i, j;
+
+	for (i = 0; i < n; i++) {
+		for (j = 0; j < m; j++) {
+			if (!matriz[i][j]) {
+				button = gtk_button_new_with_label("x");
+			} else {
+				button = gtk_button_new_with_label("  ");
+			}
+			g_signal_connect(button, "clicked", G_CALLBACK (print_hello),
+					(int * ) (j + m * i));
+			vbutton[j + m * i] = button;
+			gtk_grid_attach(GTK_GRID(grid1), button, j, i, 1, 1);
+
+		}
+	}
+}
+
+void funcion_boton_jugar(GtkWidget *widget, gpointer data) {
+	if (((op_juega_hum != 0 && op_juega_pc == 0)
+			|| (op_juega_hum == 0 && op_juega_pc != 0))
+			&& ((modofil3 != 0 && modofil4 == 0 && modofil5 == 0
+					&& modofil6 == 0 && modofil7 == 0 && modofil8 == 0)
+					|| (modofil3 == 0 && modofil4 != 0 && modofil5 == 0
+							&& modofil6 == 0 && modofil7 == 0 && modofil8 == 0)
+					|| (modofil3 == 0 && modofil4 == 0 && modofil5 != 0
+							&& modofil6 == 0 && modofil7 == 0 && modofil8 == 0)
+					|| (modofil3 == 0 && modofil4 == 0 && modofil5 == 0
+							&& modofil6 != 0 && modofil7 == 0 && modofil8 == 0)
+					|| (modofil3 == 0 && modofil4 == 0 && modofil5 == 0
+							&& modofil6 == 0 && modofil7 != 0 && modofil8 == 0)
+					|| (modofil3 == 0 && modofil4 == 0 && modofil5 == 0
+							&& modofil6 == 0 && modofil7 == 0 && modofil8 != 0))
+			&& ((modocol3 != 0 && modocol4 == 0 && modocol5 == 0
+					&& modocol6 == 0 && modocol7 == 0 && modocol8 == 0)
+					|| (modocol3 == 0 && modocol4 != 0 && modocol5 == 0
+							&& modocol6 == 0 && modocol7 == 0 && modocol8 == 0)
+					|| (modocol3 == 0 && modocol4 == 0 && modocol5 != 0
+							&& modocol6 == 0 && modocol7 == 0 && modocol8 == 0)
+					|| (modocol3 == 0 && modocol4 == 0 && modocol5 == 0
+							&& modocol6 != 0 && modocol7 == 0 && modocol8 == 0)
+					|| (modocol3 == 0 && modocol4 == 0 && modocol5 == 0
+							&& modocol6 == 0 && modocol7 != 0 && modocol8 == 0)
+					|| (modocol3 == 0 && modocol4 == 0 && modocol5 == 0
+							&& modocol6 == 0 && modocol7 == 0 && modocol8 != 0))) {
+		n = fila();
+		m = columna();
+		if (op_juega_hum) {
+
+			generarTablero(n, m);
+			grid2 = gtk_builder_get_object(builder, "grid5");
+			generarGrilla(n, m);
+		} else {
+			grid2 = gtk_builder_get_object(builder, "grid5");
+			generarGrilla2(n, m);
+
+		}
+		gtk_widget_hide((GtkWidget *) ventana_principal);
+		gtk_widget_show_all((GtkWidget *) ventana_juego);
+	}
+}
+void check_fil3(GtkWidget *widget, gpointer data) {
+	if (modofil3 == 0)
+		modofil3 = 1;
+	else if (modofil3 == 1)
+		modofil3 = 0;
+}
+void check_fil4(GtkWidget *widget, gpointer data) {
+	if (modofil4 == 0)
+		modofil4 = 1;
+	else if (modofil4 == 1)
+		modofil4 = 0;
+}
+void check_fil5(GtkWidget *widget, gpointer data) {
+	if (modofil5 == 0)
+		modofil5 = 1;
+	else if (modofil5 == 1)
+		modofil5 = 0;
+}
+void check_fil6(GtkWidget *widget, gpointer data) {
+	if (modofil6 == 0)
+		modofil6 = 1;
+	else if (modofil6 == 1)
+		modofil6 = 0;
+}
+void check_fil7(GtkWidget *widget, gpointer data) {
+	if (modofil7 == 0)
+		modofil7 = 1;
+	else if (modofil7 == 1)
+		modofil7 = 0;
+}
+void check_fil8(GtkWidget *widget, gpointer data) {
+	if (modofil8 == 0)
+		modofil8 = 1;
+	else if (modofil8 == 1)
+		modofil8 = 0;
+}
+void check_col3(GtkWidget *widget, gpointer data) {
+	if (modocol3 == 0)
+		modocol3 = 1;
+	else if (modocol3 == 1)
+		modocol3 = 0;
+}
+void check_col4(GtkWidget *widget, gpointer data) {
+	if (modocol4 == 0)
+		modocol4 = 1;
+	else if (modocol4 == 1)
+		modocol4 = 0;
+}
+void check_col5(GtkWidget *widget, gpointer data) {
+	if (modocol5 == 0)
+		modocol5 = 1;
+	else if (modocol5 == 1)
+		modocol5 = 0;
+}
+void check_col6(GtkWidget *widget, gpointer data) {
+	if (modocol6 == 0)
+		modocol6 = 1;
+	else if (modocol6 == 1)
+		modocol6 = 0;
+}
+void check_col7(GtkWidget *widget, gpointer data) {
+	if (modocol7 == 0)
+		modocol7 = 1;
+	else if (modocol7 == 1)
+		modocol7 = 0;
+}
+void check_col8(GtkWidget *widget, gpointer data) {
+	if (modocol8 == 0)
+		modocol8 = 1;
+	else if (modocol8 == 1)
+		modocol8 = 0;
+}
+void check_pc(GtkWidget *widget, gpointer data) {
+	if (op_juega_pc == 0)
+		op_juega_pc = 1;
+	else if (op_juega_pc == 1)
+		op_juega_pc = 0;
+}
+void check_hum(GtkWidget *widget, gpointer data) {
+	if (op_juega_hum == 0)
+		op_juega_hum = 1;
+	else if (op_juega_hum == 1)
+		op_juega_hum = 0;
+}
+
+int solucionario(GtkWidget *widget, gpointer data) {
+if(op_juega_hum){
+	if (data == 1) {
+		for (; indicesolu1 < n; indicesolu1++) {
+			for (; indicesolu2 < m; indicesolu2++) {
+				if (resultado[indicesolu1][indicesolu2]) {
+					print_hello(GTK_WIDGET(button),
+							(indicesolu2 + m * indicesolu1));
+					return 1;
+				}
+			}
+			if (indicesolu2 == m) {
+				indicesolu2 = 0;
+			}
+
+		}
+		if (indicesolu1 == n) {
+								indicesolu1 = 0;
+							}
+
+	} else if (data == 2) {
+		for (; indicesolu1 > -1; indicesolu1--) {
+			for (; indicesolu2 > -1; indicesolu2--) {
+				if (resultado[indicesolu1][indicesolu2]) {
+					print_hello(button, (indicesolu2 + m * indicesolu1));
+					return 1;
+				}
+
+			}
+			if (indicesolu2 == -1) {
+				indicesolu2 = m - 1;
+			}
+		}
+		indicesolu1 = indicesolu2 = 0;
+	}
+	return 0;
+}else{
+	resuelve(n,m);
+	if(comprobar_validez()){
+		if (data == 1) {
+				for (; indicesolu1 < n; indicesolu1++) {
+					for (; indicesolu2 < m; indicesolu2++) {
+						if (resultado[indicesolu1][indicesolu2]) {
+							print_hello(GTK_WIDGET(button),
+									(indicesolu2 + m * indicesolu1));
+							return 1;
+						}
+					}
+					if (indicesolu2 == m) {
+						indicesolu2 = 0;
+					}
+
+				}
+				if (indicesolu1 == n) {
+										indicesolu1 = 0;
+									}
+
+			}
+			return 0;
+	}else{
+		dialog = gtk_message_dialog_new(GTK_WINDOW (ventana_juego),
+						GTK_DIALOG_DESTROY_WITH_PARENT, GTK_MESSAGE_INFO,
+						GTK_BUTTONS_CLOSE, "¡ NO HAY SOLUCION , RESIGNATE !");
+		gtk_label_set_text(GTK_LABEL(idEtiquetaInfoBar), "¡ La pc resuelve !");
+		gtk_dialog_run(GTK_DIALOG(dialog));
+
+			gtk_widget_destroy(GTK_WIDGET(dialog) );
+	}
+	}
+return 0;
+}
+
+int main(int argc, char *argv[]) {
+	srand(time(NULL ));
+
+	guint ret;
+	GError *error = NULL;
+	gtk_init(&argc, &argv);
+	builder = gtk_builder_new();
+	ret = gtk_builder_add_from_file(builder, "lights.glade", &error);
+	if (ret == 0) {
+		g_print("Error en la función gtk_builder_add_from_file:\n%s",
+				error->message);
+		return 1;
+	}
+
+	g_free(error);
+
+	contador = gtk_builder_get_object(builder, "contador");
+	ventana_principal = gtk_builder_get_object(builder, "ventana_principal");
+	g_signal_connect(ventana_principal, "destroy", G_CALLBACK (gtk_main_quit),
+			NULL);
+	boton_ir_jugar = gtk_builder_get_object(builder, "boton_sgte");
+	g_signal_connect(boton_ir_jugar, "clicked",
+			G_CALLBACK (funcion_boton_jugar), NULL);
+	ventana_juego = gtk_builder_get_object(builder, "ventana_juego");
+	g_signal_connect(ventana_juego, "destroy", G_CALLBACK(gtk_main_quit), NULL);
+
+	boton_sgt = gtk_builder_get_object(builder, "boton_sgt");
+	boton_atras = gtk_builder_get_object(builder, "boton_atras");
+
+	g_signal_connect(boton_sgt, "clicked", G_CALLBACK (solucionario),
+			(int * )1);
+	g_signal_connect(boton_atras, "clicked", G_CALLBACK (solucionario),
+			(int * ) 2);
+
+	//
+	fil3 = gtk_builder_get_object(builder, "3fil");
+	g_signal_connect(fil3, "clicked", G_CALLBACK (check_fil3), NULL);
+	fil4 = gtk_builder_get_object(builder, "4fil");
+	g_signal_connect(fil4, "clicked", G_CALLBACK (check_fil4), NULL);
+	fil5 = gtk_builder_get_object(builder, "5fil");
+	g_signal_connect(fil5, "clicked", G_CALLBACK (check_fil5), NULL);
+	fil6 = gtk_builder_get_object(builder, "6fil");
+	g_signal_connect(fil6, "clicked", G_CALLBACK (check_fil6), NULL);
+	fil7 = gtk_builder_get_object(builder, "7fil");
+	g_signal_connect(fil7, "clicked", G_CALLBACK (check_fil7), NULL);
+	fil8 = gtk_builder_get_object(builder, "8fil");
+	g_signal_connect(fil8, "clicked", G_CALLBACK (check_fil8), NULL);
+	//
+	col3 = gtk_builder_get_object(builder, "3col");
+	g_signal_connect(col3, "clicked", G_CALLBACK (check_col3), NULL);
+	col4 = gtk_builder_get_object(builder, "4col");
+	g_signal_connect(col4, "clicked", G_CALLBACK (check_col4), NULL);
+	col5 = gtk_builder_get_object(builder, "5col");
+	g_signal_connect(col5, "clicked", G_CALLBACK (check_col5), NULL);
+	col6 = gtk_builder_get_object(builder, "6col");
+	g_signal_connect(col6, "clicked", G_CALLBACK (check_col6), NULL);
+	col7 = gtk_builder_get_object(builder, "7col");
+	g_signal_connect(col7, "clicked", G_CALLBACK (check_col7), NULL);
+	col8 = gtk_builder_get_object(builder, "8col");
+	g_signal_connect(col8, "clicked", G_CALLBACK (check_col8), NULL);
+	//
+	juega_hum = gtk_builder_get_object(builder, "humano");
+	g_signal_connect(juega_hum, "clicked", G_CALLBACK (check_hum), NULL);
+	juega_pc = gtk_builder_get_object(builder, "pc");
+	g_signal_connect(juega_pc, "clicked", G_CALLBACK (check_pc), NULL);
+	//
+
+	gtk_widget_show_all((GtkWidget *) ventana_principal);
+
+	/* start the main loop, and let it rest there until the application is closed */
+	gtk_main();
+
+	return 0;
+}
